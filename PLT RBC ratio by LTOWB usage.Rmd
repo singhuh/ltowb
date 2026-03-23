@@ -1,0 +1,331 @@
+---
+title: "<img src='ARC_Logo.png' style='float: right; width: 250px;'/>**Platelet:RBC Ratio by LTOWB Usage 2018-2025** "
+author: "American Red Cross Biomedical Services"
+date: "`r format(Sys.time(), '%a %d %B %Y')`"
+# output: html_document
+always_allow_html: true
+output:
+  html_document:
+    code_folding: hide
+    df_print: paged
+    # css: style.css
+    includes:
+      # in_header: "/ARC_Logo.png"
+  classoption: landscape
+    # mainfont: Arial
+  pdf_document: 
+    keep_tex: true
+    latex_engine: xelatex
+  word_document: default
+  # github_document: default
+  fig_caption: yes
+  keep_md: yes
+
+---
+
+## Temporal Patterns in Platelet‑to‑Red Cell Transfusion Ratios Across Hospitals With Varying LTOWB Utilization{.tabset .tabset-fade .tabset-pills}
+### Median PLT:RBC by LTWOB Usage
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(ggpubr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(lme4)       # mixed models
+library(lmerTest)   # p-values & Type III tests (Satterthwaite/KR)
+library(emmeans)    # marginal means & pairwise comparisons
+set.seed(123)
+
+
+df <- read_excel('E:\\ARC\\Projects\\LTOWB PLT RBC\\ltowb\\ltwobhosp.xlsx')
+df <- df %>% filter(!is.na(customer_cd), !is.na(pltrbcratio)) 
+# Ensure factor ordering (optional)
+df <- df %>%
+  mutate(
+    ltwobcat = factor(ltwobcat, levels = c("<2.5","2.5-5.0",">5")),
+    calendar_yr = as.integer(calendar_yr)
+  )
+
+# Summarize: mean and SE (cluster-robust CIs optional in B)
+summary_by_year <- df %>%
+  group_by(ltwobcat, calendar_yr) %>%
+  summarise(
+    n = n(),
+    median_pltrbc = median(pltrbcratio, na.rm = TRUE),
+    sd_pltrbc = sd(pltrbcratio, na.rm = TRUE),
+    se_pltrbc = sd_pltrbc / sqrt(n),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    ci_l = median_pltrbc - qt(0.975, pmax(n-1,1)) * se_pltrbc,
+    ci_u = median_pltrbc + qt(0.975, pmax(n-1,1)) * se_pltrbc
+  )
+
+# Line with points and ribbons by category
+ggplot(summary_by_year,
+       aes(x = calendar_yr, y = median_pltrbc, color = ltwobcat, group = ltwobcat)) +
+  # geom_ribbon(aes(ymin = ci_l, ymax = ci_u, fill = ltwobcat),
+  #             color = NA, alpha = 0.12, show.legend = FALSE) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  scale_x_continuous(breaks = sort(unique(summary_by_year$calendar_yr))) +
+  labs(
+    x = "Calendar year",
+    y = "PLT:RBC ratio",
+    color = "LTWOB %usage",
+    title = "Change in PLT:RBC ratio by LTWOB category over time (descriptive medians)"
+  ) +
+  theme_pubclean(base_size = 12) +
+  ylim(0,1.2)
+```
+
+- Across eight years of observation, only hospitals with >5% LTWOB usage demonstrated a substantial temporary rise in PLT:RBC ratios, peaking in 2020, with subsequent decline and convergence toward the lower utilization categories by 2023–2025.
+- These descriptive patterns suggest early implementation‑related variability in high‑LTWOB hospitals, with stabilization of transfusion ratios over time.
+  + *Note: These values represent descriptive medians and do not reflect model‑adjusted estimates or tests of statistical significance.*
+
+
+### Comparing hosp. by LTOWB% for PLT:RBC by year{.tabset}
+#### Mixed model: Random intercept for hospital
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+library(pbkrtest)
+df -> hosp
+hosp <- hosp %>%
+  mutate(
+    year_f = factor(calendar_yr),              # like calendar_yr_c in SAS
+    customer_cd = factor(customer_cd)
+  )
+
+#Fit linear mixed model (Gaussian, identity link; REML ~ PROC MIXED default)
+m <- lmer(pltrbcratio ~ ltwobcat * year_f + (1 | customer_cd), data = hosp, REML = TRUE)
+
+#--- Global Type III tests (focus on the interaction)
+a <- anova(m, type = 3, ddf = "Kenward-Roger") #If pbkrtest is not installed, lmerTest will fall back to Satterthwaite
+
+# Replace row names with publication‑ready labels
+rownames(a) <- c("LTWOB category",
+                 "Calendar year",
+                 "LTWOB category × year")
+
+a
+```
+
+- A linear mixed model (hospital random intercept) showed a highly significant 
+**LTWOB category × year** interaction (F(12, 410.8) = 19.5, p < 2.2×10⁻¹⁶), 
+  + indicating that differences in PLT:RBC ratio across LTWOB adoption levels 
+    changed substantially over time.
+- Main effects for **year** (p < 10⁻⁹) and **LTWOB** category (p = 0.019) were also significant, 
+but are not interpreted because of the strong interaction.
+
+#### Within-year tests
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+# ======================================================
+# 4) Within-year tests: Do LTWOB categories differ *in each year*?
+#    Tukey-adjusted pairwise differences and overall F per year
+# ======================================================
+emm <- emmeans(m, ~ ltwobcat | year_f)   # LS-means by category within each year
+# Tukey-adjusted pairwise comparisons within each year
+pw <- pairs(emm, adjust = "tukey")
+
+# Convert to clean data frame
+pw_df <- as.data.frame(pw)
+
+library(knitr)
+remotes::install_github("haozhu233/kableExtra")
+library(kableExtra)
+# Clean and format the output
+pw_clean <- pw_df %>%
+  mutate(
+    Year     = as.character(year_f),
+    Contrast = contrast,
+    Estimate = ifelse(is.na(estimate), "nonEst", sprintf("%.3f", estimate)),
+    SE       = ifelse(is.na(SE),       "NA",     sprintf("%.3f", SE)),
+    DF       = ifelse(is.na(df),       "NA",     sprintf("%.0f", df)),
+    t_ratio  = ifelse(is.na(t.ratio),  "NA",     sprintf("%.2f", t.ratio)),
+    p_value  = ifelse(
+                  is.na(p.value), 
+                  "NA",
+                  ifelse(p.value < 0.0001,
+                         "<0.0001",
+                         sprintf("%.4f", p.value)))
+  ) %>%
+  select(Year, Contrast, Estimate, SE, DF, t_ratio, p_value)
+
+# Render as formatted publication-style table
+pw_clean %>%
+  kable(
+    caption = "Tukey-adjusted pairwise differences in PLT:RBC ratio by LTWOB category within each calendar year.",
+    booktabs = TRUE,
+    align = "lcccccc"
+  ) %>%
+  kable_styling(
+    full_width = FALSE,
+    position = "center",
+    bootstrap_options = c("striped", "hover", "condensed")
+  ) %>%
+  collapse_rows(columns = 1, valign = "top")
+
+```
+
+- The output shows within‑year comparisons among the 3 LTWOB categories:
+  + '<2.5% LTOWB use'
+  + '2.5–5.0% LTOWB use'
+  + '>5% LTOWB use'
+ 
+- These are LS‑mean (model‑adjusted) differences in PLT:RBC ratio, computed separately for each year.
+  + The Tukey method adjusts for the 3 comparisons within each year.
+  
+- **2018**: No estimable comparisons.
+- **2019**: No differences.
+- **2020**: highly significant spike in the >5 category vs both other groups.
+  + <2.5 and 2.5–5.0 do not differ (p ≈ 0.99).
+  + Both are dramatically lower than >5 (difference ≈ −3.0 units, p < 0.0001).
+  + **Conclusion (2020)**: The hospitals with >5% LTOWB usage have significantly higher PLT:RBC than both other LTWOB groups.
+- **2021**: No differences.
+- **2022**: *Reverse effect*: >5 category now has significantly lower PLT:RBC ratio than both 2.5–5.0 and <2.5.
+<2.5 and 2.5–5.0 do not differ significantly. Both have significantly higher PLT:RBC ratio than the >5 category.
+**Conclusion:** A reversal compared to 2020. Now hospitals with >5% LTOWB usage have significantly lower PLT:RBC ratio.
+- **2023–2025**: No meaningful differences; groups converge in 2023; LTWOB categories remain similar 
+
+### Model-adjusted means 
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+emm_df <- as.data.frame(emm) %>%
+  rename(emmean = emmean, lower = lower.CL, upper = upper.CL) %>%
+  mutate(calendar_yr = as.integer(as.character(year_f)))
+
+ggplot(emm_df, aes(calendar_yr, emmean, color = ltwobcat, group = ltwobcat)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.15, alpha = 0.7) +
+  scale_color_manual(values = c("<2.5"="#e15759","2.5-5.0"="#59a14f",">5"="#4e79a7"),
+                     name = "LTWOB category") +
+  scale_x_continuous(breaks = sort(unique(emm_df$calendar_yr))) +
+  labs(
+    title = "Adjusted PLT:RBC ratio between hospitals categorized by LTWOB % over time (mixed model LS-means)",
+    x = "Calendar year", y = "Adjusted PLT:RBC ratio (LS-mean)"
+  ) +
+  theme_pubclean(base_size = 13) +
+  theme(legend.position = "top")
+```
+
+### Effect sizes{.tabset}
+#### Effect sizes as differences vs a reference category by year{.tabset}
+##### ">5 minus <2.5"
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+ref_contr <- contrast(emm, method = list(">5 minus <2.5" = c(-1, 0, 1)), adjust = "none")
+res <- summary(ref_contr, infer = TRUE)
+
+res_clean <- as.data.frame(res) %>%
+  dplyr::select(
+    Year = year_f,
+    Contrast = contrast,
+    Estimate = estimate,
+    Lower.CL = lower.CL,
+    Upper.CL = upper.CL,
+    P.value = p.value
+  )
+
+res_clean <- res_clean %>%
+  mutate(
+    Estimate = ifelse(is.na(Estimate), "nonEst", sprintf("%.3f", Estimate)),
+    Lower.CL = ifelse(is.na(Lower.CL), "NA", sprintf("%.3f", Lower.CL)),
+    Upper.CL = ifelse(is.na(Upper.CL), "NA", sprintf("%.3f", Upper.CL)),
+    P.value  = ifelse(
+                 is.na(P.value), "NA",
+                 ifelse(P.value < 0.0001, "<0.0001", sprintf("%.4f", P.value))
+               )
+  )
+
+res_clean %>%
+  kable(
+    caption = "Adjusted Difference (>5% minus 2.5–5%) in PLT:RBC Ratio by Year",
+    booktabs = TRUE,
+    align = "lcccccc"
+  ) %>%
+  kable_styling(
+    full_width = FALSE,
+    position = "center",
+    bootstrap_options = c("striped", "hover", "condensed")
+  ) %>%
+  collapse_rows(columns = 1, valign = "top")
+```
+
+
+- These estimates represent adjusted mean differences in PLT:RBC ratio between hospitals with >5% LTWOB 
+usage and those with <2.5%, generated from a linear mixed model including a hospital‑level random intercept 
+and a LTWOB category × year interaction. 
+  + Positive values indicate higher PLT:RBC ratios in the >5% group; 
+  + Negative values indicate lower ratios. 
+  + Confidence intervals are 95%, with Kenward–Roger degrees of freedom.
+  + The adjusted difference in PLT:RBC ratio between hospitals with >5% versus <2.5% 
+  + LTWOB utilization varied substantially over time. 
+
+- A pronounced elevation in the >5% group was observed in 2020 (difference, 3.03; p < 0.0001), representing a strong 
+early divergence in component use.
+- By 2022, this pattern reversed, with the >5% group demonstrating significantly lower adjusted ratios 
+(difference, −0.90; p = 0.012).
+- No significant differences were observed in 2019 or 2021, nor in 2023–2025, indicating a return to alignment 
+across LTWOB categories in later years.
+- The adjusted difference in PLT:RBC ratio between hospitals with >5% and <2.5 LTWOB utilization varied 
+substantially over time (significant interaction). A marked elevation in PLT:RBC ratio was observed 
+among >5% hospitals in 2020, with adjusted differences exceeding 3 units compared with the <2.5% group (p < 0.0001).
+- By 2022, this pattern reversed, with the >5% group demonstrating significantly lower adjusted ratios 
+(difference ≈ −0.9; p = 0.01).
+- For all subsequent years (2023–2025), the categories showed no meaningful differences, with point estimates clustered near zero.
+
+##### ">5 minus 2.5-5"
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+ref_contr <- contrast(emm, method = list(">5 minus 2.5-5" = c(0, -1, 1)), adjust = "none")
+
+res <- summary(ref_contr, infer = TRUE)
+
+res_clean <- as.data.frame(res) %>%
+  dplyr::select(
+    Year = year_f,
+    Contrast = contrast,
+    Estimate = estimate,
+    Lower.CL = lower.CL,
+    Upper.CL = upper.CL,
+    P.value = p.value
+  )
+
+res_clean <- res_clean %>%
+  mutate(
+    Estimate = ifelse(is.na(Estimate), "nonEst", sprintf("%.3f", Estimate)),
+    Lower.CL = ifelse(is.na(Lower.CL), "NA", sprintf("%.3f", Lower.CL)),
+    Upper.CL = ifelse(is.na(Upper.CL), "NA", sprintf("%.3f", Upper.CL)),
+    P.value  = ifelse(
+                 is.na(P.value), "NA",
+                 ifelse(P.value < 0.0001, "<0.0001", sprintf("%.4f", P.value))
+               )
+  )
+
+res_clean %>%
+  kable(
+    caption = "Adjusted Difference (>5% minus 2.5–5%) in PLT:RBC Ratio by Year",
+    booktabs = TRUE,
+    align = "lcccccc"
+  ) %>%
+  kable_styling(
+    full_width = FALSE,
+    position = "center",
+    bootstrap_options = c("striped", "hover", "condensed")
+  ) %>%
+  collapse_rows(columns = 1, valign = "top")
+```
+
+- The adjusted difference in PLT:RBC ratio between hospitals with >5% and 2.5–5% LTWOB utilization varied 
+substantially over time (significant interaction). A marked elevation in PLT:RBC ratio was observed 
+among >5% hospitals in 2020, with adjusted differences exceeding 3 units compared with the 2.5–5% group (p < 0.0001).
+- A pronounced elevation in the >5% group was observed in 2020 (difference, 3.06; p < 0.0001), representing a strong 
+early divergence in component use.
+- By 2022, this pattern reversed, with the >5% group demonstrating significantly lower adjusted ratios 
+(difference, −1.47; p = 0.003).
+- No significant differences were observed in 2019 or 2021, nor in 2023–2025, indicating a return to alignment 
+across LTWOB categories in later years.
+- For all subsequent years (2023–2025), the categories showed no meaningful differences, with point estimates clustered near zero.
+> Temporal fluctuations in PLT:RBC ratio among hospitals with higher LTWOB usage suggest early variability in transfusion 
+practices during whole‑blood program rollout, followed by stabilization and convergence across hospitals in subsequent years.
