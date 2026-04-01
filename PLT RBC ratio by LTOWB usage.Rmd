@@ -587,13 +587,14 @@ list3 %>% gt() %>%
   # tab_style(style = list(cell_fill(color = "#ddf5bf")), locations = cells_body(rows = cluster == "High penetration")) %>%
   tab_footnote("") %>%
   cols_width(
-    customer_cd  ~px(90),
-    Hospital ~ px(240),
-    City     ~ px(100),
+    customer_cd  ~px(87),
+    Hospital ~ px(280),
+    City     ~ px(97),
     State    ~ px(30),
-    `Cancer Ctr` ~ px(70),
+    Zip ~ px(40),
+    `Cancer Ctr` ~ px(65),
     `Trauma Ctr`    ~ px(70),
-    Beds    ~ px(50),
+    Beds    ~ px(40),
     Surgeries ~ px(90),
     # contact ~ px(100),
     everything() ~ px(5)
