@@ -552,7 +552,8 @@ list2 <- lt2perc_details %>%
           "Surgeries"= "Surgeries Cnt",
           "Max LTOWB%" = "max_ltwobp"
   ) |>
-  distinct() 
+  distinct() |>
+  arrange(desc(Beds))
 
 writexl::write_xlsx(x=list2, path ="E:\\ARC\\Projects\\LTOWB PLT RBC\\ltowb\\list2.xlsx")
 download_file( 
