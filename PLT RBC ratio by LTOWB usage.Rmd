@@ -513,69 +513,62 @@ less_than_2perc <- hosp %>%
     .groups = "drop"
   ) %>%
   filter(always_less_2)
-less_than_2perc_details <- hosp %>%
-  semi_join(hosp, by = "customer_cd") %>%
-  distinct(customer_cd, master_customer_nm) %>%
-  arrange(customer_cd)
 
-list2 <- less_than_2perc_details %>% select(customer_cd) %>% 
-  left_join(hospdetails, by = c(customer_cd = "Master Customer Cd"))   %>% 
-  select(-c("Ship To Cntry", "Ship To Addr1")) |> distinct() %>%
-  rename("Hospital" = "Master Customer Nm", 
-       "City"  =  "Ship To City"  ,
-       "State" =  "Ship To State",
-       "Zip"  =  "Ship To Zip"  ,
-       "Cancer Ctr"  = "cancer_ctr_flg",
-       "Trauma Ctr"=  "trauma_ctr_flg",
-       "Beds"=  "Bed Cnt"      ,
-       "Surgeries"= "Surgeries Cnt" 
-           ) |>
-  distinct() %>% filter(City != '') %>% distinct() %>% #distinct(customer_cd, Hospital, City, State, `Cancer Ctr`,`Trauma Ctr`, `Beds`, `Surgeries`)
-  arrange(desc(`Beds`))
-
-# list2 <- less_than_2perc_details %>% select(customer_cd) %>% 
-#   left_join(hospdetails, by = c(customer_cd = "Master Customer Cd")) %>% distinct()  
-
-# list2_details <- list2 %>% 
-#   left_join(hospdetails, by = c(customer_cd = "Master Customer Cd")) |>
-#   select(-c("Master Customer Nm", "Ship To Cntry")) 
-#   rename("Hospital" = "master_customer_nm", 
-#        "Address" =  "Ship To Addr1"  ,
-#        "City"  =  "Ship To City"  ,
-#        "State" =  "Ship To State",
-#        "Zip"  =  "Ship To Zip"  ,
-#        "Cancer Ctr"  = "cancer_ctr_flg",
-#        "Trauma Ctr"=  "trauma_ctr_flg",
-#        "Beds"=  "Bed Cnt"      ,
-#        "Surgeries"= "Surgeries Cnt" 
-#            ) |>
-#   distinct()
+hospdetails <- read_excel('E:\\ARC\\Projects\\Tim\\csp\\hospitals.xlsx') 
+hospdetails <- hospdetails %>% select("Customer Key","Customer Cd" , "Customer Nm", 
+                                      "Ship To Addr1","Ship To City","Ship To State" ,"Ship To Zip","Master Customer Cd","Master Customer Nm", 
+                                      "Bed Cnt","Surgeries Cnt","cancer_ctr_flg","trauma_ctr_flg"
+)
 
 
-list3 <- list2 %>%
+hospdetails <- hospdetails %>%
+  mutate(`Ship To Zip` = stringr::str_pad(`Ship To Zip`, width = 5, side = "left", pad = "0"))
+
+
+less_than_2perc_details <- less_than_2perc %>%
+  left_join(hospdetails, by = c("customer_cd" = "Customer Cd")) 
+
+lt2perc_details <- less_than_2perc_details %>%
   mutate(
     n_filled = rowSums(!is.na(.) & trimws(as.character(.)) != "")
   ) %>%
   group_by(customer_cd) %>%
   slice_max(n_filled, n = 1, with_ties = FALSE) %>%
   ungroup() %>%
-  select(-n_filled) %>% arrange(desc(Beds))
+  select(-n_filled)
 
-writexl::write_xlsx(x=list3, path ="E:\\ARC\\Projects\\LTOWB PLT RBC\\ltowb\\list3.xlsx")
+
+list2 <- lt2perc_details %>% 
+  select("customer_cd","Master Customer Nm","Ship To Addr1","Ship To City","Ship To State", 
+         "Ship To Zip","cancer_ctr_flg","trauma_ctr_flg","Bed Cnt","Surgeries Cnt","max_ltwobp") %>%
+  rename( "Hospital ID" = "customer_cd",
+          "Hospital" = "Master Customer Nm", 
+          "City"  =  "Ship To City"  ,
+          "State" =  "Ship To State",
+          "Zip"  =  "Ship To Zip"  ,
+          "Cancer Ctr"  = "cancer_ctr_flg",
+          "Trauma Ctr"=  "trauma_ctr_flg",
+          "Beds"=  "Bed Cnt"      ,
+          "Surgeries"= "Surgeries Cnt",
+          "Max LTOWB%" = "max_ltwobp"
+  ) |>
+  distinct() 
+
+writexl::write_xlsx(x=list2, path ="E:\\ARC\\Projects\\LTOWB PLT RBC\\ltowb\\list2.xlsx")
 download_file( 
-  path = "E:\\ARC\\Projects\\LTOWB PLT RBC\\ltowb\\list3.xlsx",
+  path = "E:\\ARC\\Projects\\LTOWB PLT RBC\\ltowb\\list2.xlsx",
   output_name = "Hospitals_w_LTOWB_2orbelow",
   button_label = "download data (Excel)" ,
   button_type = "info",
   has_icon = TRUE,
   self_contained = TRUE
-  )
+)
 
-list3 %>% gt() %>% 
+list2 %>% select(-c("Ship To Addr1")) %>%
+  gt() %>% 
   tab_header(title = "Table 2. Hospitals with LTOWB% below 2%",
              subtitle = "arranged in descending order of bed size") %>%
-  cols_label(customer_cd = "Hospital Code") %>%
-  tab_spanner(label = "Hospital Details", columns = c(`Cancer Ctr`,`Trauma Ctr`, `Beds`, `Surgeries`)) %>%
+  tab_spanner(label = "Hospital Details", columns = c(`Cancer Ctr`,`Trauma Ctr`, `Beds`, `Surgeries`, "Max LTOWB%")) %>%
   cols_align("left", columns = everything()) %>%
   tab_options(table.border.left.color = "white",
               table.border.right.color = "white",
@@ -587,20 +580,20 @@ list3 %>% gt() %>%
   # tab_style(style = list(cell_fill(color = "#ddf5bf")), locations = cells_body(rows = cluster == "High penetration")) %>%
   tab_footnote("") %>%
   cols_width(
-    customer_cd  ~px(87),
-    Hospital ~ px(280),
+    `Hospital ID`  ~px(87),
+    Hospital ~ px(200),
     City     ~ px(97),
     State    ~ px(30),
-    Zip ~ px(40),
+    Zip ~ px(50),
     `Cancer Ctr` ~ px(65),
     `Trauma Ctr`    ~ px(70),
     Beds    ~ px(40),
     Surgeries ~ px(90),
     # contact ~ px(100),
-    everything() ~ px(5)
+    everything() ~ px(70)
   ) |>
   tab_options(table.font.size = px(11)) |>
-tab_options(
+  tab_options(
     table.width = pct(100)
   )
 ```
