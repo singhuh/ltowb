@@ -118,7 +118,14 @@ output:
 </style>
 <style>
 /* Sticky tabs */
-.nav-tabs {
+.nav-tabs > li.active > a[aria-controls="csp-up"]  {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: white;
+  border-bottom: 1px solid #ddd;
+}
+.nav-tabs > li.active > a[aria-controls="csp-down"]  {
   position: sticky;
   top: 0;
   z-index: 1000;
