@@ -1,0 +1,1177 @@
+---
+title: "<img src='ARC_Logo.png' style='float: right; width: 250px;'/>**Platelet:RBC Ratio by LTOWB Usage 2018-2025** "
+author: "American Red Cross Biomedical Services"
+date: "`r format(Sys.time(), '%a %d %B %Y')`"
+# output: html_document
+always_allow_html: true
+output:
+  html_document:
+    code_folding: hide
+    df_print: paged
+    # css: style.css
+    includes:
+      # in_header: "/ARC_Logo.png"
+  classoption: landscape
+    # mainfont: Arial
+  pdf_document: 
+    keep_tex: true
+    latex_engine: xelatex
+  word_document: default
+  # github_document: default
+  fig_caption: yes
+  keep_md: yes
+
+---
+
+
+<style>
+.main-container {
+  max-width: 75% !important;
+}
+/* ---------- Base tab styling ---------- */
+.nav-tabs > li > a {
+  background-color: #f3f3f3 !important;   /* inactive light */
+  color: #444 !important;
+  font-weight: 500;
+  transition: all 0.25s ease-in-out;
+}
+
+/* Remove default borders */
+.nav-tabs > li > a {
+  border: 1px solid #ddd !important;
+}
+
+/* ---------- ACTIVE tabs ---------- */
+.nav-tabs > li.active > a {
+  color: white !important;
+  font-weight: 600;
+}
+
+/* CSP%-Up → GREEN */
+.nav-tabs > li.active > a[aria-controls="csp-up"] {
+  background-color: #2ca02c !important;
+  border-color: #2ca02c !important;
+}
+
+/* CSP%-Down → RED */
+.nav-tabs > li.active > a[aria-controls="csp-down"] {
+  background-color: #d62728 !important;
+  border-color: #d62728 !important;
+}
+
+/* ---------- Icons ---------- */
+.nav-tabs > li > a[aria-controls="csp-up"]::before {
+  content: "▲ ";
+  color: #2ca02c;
+  font-weight: 700;
+}
+
+.nav-tabs > li > a[aria-controls="csp-down"]::before {
+  content: "▼ ";
+  color: #d62728;
+  font-weight: 700;
+}
+
+/* ---------- Smooth fade / slide animation ---------- */
+.tab-pane {
+  animation: fadeSlide 0.3s ease-in-out;
+}
+
+@keyframes fadeSlide {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+</style>
+
+<style>
+/* Low */
+.cluster-low ~ .nav-tabs > li.active > a {
+  box-shadow: inset 0 -4px 0 #b8c0a8;
+}
+
+/* Moderate */
+.cluster-moderate ~ .nav-tabs > li.active > a {
+  box-shadow: inset 0 -4px 0 #ffbf00;
+}
+
+/* High */
+.cluster-high ~ .nav-tabs > li.active > a {
+  box-shadow: inset 0 -4px 0 #dd5e5e;
+}
+</style>
+
+<style>
+/* Badge look */
+.nav-tabs > li > a code {
+  background-color: rgba(255,255,255,0.25);
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 0.85em;
+  margin-left: 4px;
+}
+</style>
+<style>
+/* Sticky tabs */
+.nav-tabs > li.active > a[aria-controls="csp-up"]  {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: white;
+  border-bottom: 1px solid #ddd;
+}
+.nav-tabs > li.active > a[aria-controls="csp-down"]  {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: white;
+  border-bottom: 1px solid #ddd;
+}
+</style>
+
+<style>
+/* ---------- ACTIVE SUB-TAB TEXT COLOR ---------- */
+/* Nested tabsets only */
+.tabset .tabset .nav-tabs > li.active > a,
+.tabset .tabset .nav-tabs > li.active > a:hover,
+.tabset .tabset .nav-tabs > li.active > a:focus {
+  color: #000000 !important;   /* black */
+  font-weight: 600;
+}
+</style>
+
+
+
+<h2 style="font-size:16px; font-weight:bold;">
+Temporal Patterns in Platelet‑to‑Red Cell Transfusion Ratios Across Hospitals With Varying LTOWB Utilization
+</h2>
+## Analysis{.tabset .tabset-fade .tabset-pills}
+### LTOWB% by year{.tabset}
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(ggpubr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(lme4)       # mixed models
+library(lmerTest)   # p-values & Type III tests (Satterthwaite/KR)
+library(emmeans)    # marginal means & pairwise comparisons
+library(scales)
+library(knitr)
+library(kableExtra)
+library(data.table)
+library(htmltools)
+library(maps)
+library(downloadthis)
+library(writexl)
+library(gt)
+library(sumExtras)
+
+set.seed(123)
+hospdetails <- read_excel('E:\\ARC\\Projects\\Tim\\csp\\hospitals.xlsx') |>
+  filter("Master Customer Cd" != "") |>
+  select("Master Customer Cd", "Master Customer Nm", "Ship To Addr1","Ship To City","Ship To State","Ship To Zip","Ship To Cntry", "cancer_ctr_flg","trauma_ctr_flg","Bed Cnt","Surgeries Cnt")           
+  
+df <- read_excel('E:\\ARC\\Projects\\LTOWB PLT RBC\\ltowb\\ltwobhosp.xlsx')
+df <- df %>% filter(!is.na(customer_cd), !is.na(pltrbcratio)) 
+# Ensure factor ordering (optional)
+df <- df %>%
+  mutate(
+    ltwobcat = factor(ltwobcat, levels = c("<2","2-5",">5")),
+    calendar_yr = as.integer(calendar_yr)
+  )
+df -> hosp
+
+
+hosp_pct <- hosp %>%
+  group_by(calendar_yr, ltwobcat) %>%
+  summarise(n_hosp = n(), .groups = "drop") %>%
+  group_by(calendar_yr) %>%
+  mutate(
+    total = sum(n_hosp),
+    pct = n_hosp / total
+  ) %>%
+  ungroup()
+
+theme_jama <- function(base_size = 13){
+  theme_minimal(base_size = base_size) +
+    theme(
+      text = element_text(family = "Arial"),     # JAMA uses Helvetica/Arial
+      plot.title = element_text(face = "bold", size = base_size + 1),
+      legend.position = "top",
+      panel.grid.minor = element_blank(),
+      panel.grid.major.x = element_blank(),
+      axis.text.x = element_text(angle = 0),
+      axis.title = element_text(size = base_size)
+    )
+}
+jama_gray <- c(
+  "<2" = "gray70",
+  "2-5" = "gray50",
+  ">5" = "gray20"
+)
+
+ggplot(hosp_pct,
+       aes(x = calendar_yr,
+           y = pct,
+           group = ltwobcat,
+           color = ltwobcat)) +
+  
+  geom_line(linewidth = 1.5) +
+  geom_point(size = 3) +
+  
+  scale_color_manual(
+    values = jama_gray,
+    name = "LTWOB category"
+  ) +
+  
+  scale_y_continuous(
+    labels = percent_format(accuracy = 1),
+    limits = c(0, 1)
+  ) +
+  
+  scale_x_continuous(
+    breaks = sort(unique(hosp_pct$calendar_yr))
+  ) +
+geom_text(aes(label = paste0(round(100*pct,1), "%")),
+              vjust = -0.8,
+              size = 3.3) +
+  
+  labs(
+    title = "Percentage of Hospitals in Each LTWOB Category by Year",
+    x = "Calendar Year",
+    y = "Percentage of Hospitals"
+  ) +  theme_jama()
+```
+
+
+**Percentage of Hospitals in Each LTWOB Category by Calendar Year**
+- This figure displays the proportion of hospitals falling into each low‑titer O whole blood (LTOWB) utilization category—<2%, 2.5–5.0%, and >5%—from 2018 through 2025. Percentages represent the share of all hospitals reporting data in a given year.
+
+- **Key Findings**
+  + **Growth of higher LTWOB categories over time.**
+  + Hospitals utilizing LTWOB at >5% or 2.5–5% remained a minority but expanded steadily after 2022.
+- The >5% category increased from 1.4% in 2022 to 18.1% in 2024 and 18.1% in 2025.
+- The 2.5–5% category increased modestly, reaching 11.1% in 2024–2025.
+
+**Inflection point in 2022.**
+- In 2022, the <2% category temporarily peaked at 97.1%, coinciding with the lowest representation of higher‑use hospitals (<3% in both mid‑tier and high‑tier categories).<br>
+- Beginning in 2023, however, the distribution began to shift as more hospitals incorporated LTWOB at higher percentages.
+
+**Emerging adoption pattern after 2023.**
+- Between 2023 and 2025, the proportion of hospitals performing >5% LTWOB usage increased more sharply compared with the 2.5–5% group, suggesting movement directly from low (<2%) to high (>5%) uptake rather than gradual progression. 
+
+#### Hospitals increasing LTOWB use{.tabset #csp-up}
+##### List
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+hosp <- hosp %>%
+  mutate(
+    ltwobcat = factor(ltwobcat,
+                      levels = c("<2", "2-5", ">5"))
+  )
+
+remove(switchers)
+switchers <- hosp %>%
+  arrange(customer_cd, calendar_yr) %>%
+  group_by(customer_cd) %>%
+  summarise(
+    less_than_2pct  = any(ltwobcat == "<2"),
+    greater_than_5pct = any(ltwobcat == ">5"),
+    switch_year = ifelse(
+      less_than_2pct & greater_than_5pct,
+      min(calendar_yr[ltwobcat == ">5"]),  # first year >5%
+      NA
+    ),
+    .groups = "drop"
+  ) %>%
+  filter(less_than_2pct & greater_than_5pct)
+
+switchers <- switchers %>% 
+  left_join(select(hosp, customer_cd, master_customer_nm), by = "customer_cd") %>%
+  select(customer_cd, master_customer_nm, less_than_2pct, greater_than_5pct, switch_year) %>%
+  distinct(customer_cd, master_customer_nm, less_than_2pct, greater_than_5pct, switch_year) %>%
+  arrange(switch_year)
+
+list2_5 <- switchers %>% select(customer_cd) %>% left_join(hospdetails, by = c(customer_cd = "Master Customer Cd")) %>% distinct()  
+
+switchers_details <- switchers %>% 
+  left_join(hospdetails, by = c(customer_cd = "Master Customer Cd")) |>
+  select(-c("Master Customer Nm", less_than_2pct, greater_than_5pct, "Ship To Cntry")) |>
+  rename("Hospital" = "master_customer_nm", 
+       "Address" =  "Ship To Addr1"  ,
+       "City"  =  "Ship To City"  ,
+       "State" =  "Ship To State",
+       "Zip"  =  "Ship To Zip"  ,
+       "Cancer Ctr"  = "cancer_ctr_flg",
+       "Trauma Ctr"=  "trauma_ctr_flg",
+       "Bed Cnt"=  "Bed Cnt"      ,
+       "Surgeries Cnt"= "Surgeries Cnt" ,
+       "Switch Yr." = switch_year
+           ) |>
+  distinct()
+
+# writexl::write_xlsx(x=list2_5, path ="E:\\ARC\\Projects\\LTOWB PLT RBC\\ltowb\\list2_5.xlsx")
+# download_file( 
+#   path = "E:\\ARC\\Projects\\LTOWB PLT RBC\\ltowb\\list2_5.xlsx",
+#   output_name = "Hospitals_w_LTOWB_2to5",
+#   button_label = "download data (Excel)" ,
+#   button_type = "info",
+#   has_icon = TRUE,
+#   self_contained = TRUE
+#   )
+
+
+switchers_det <- switchers_details %>% rename(Beds = `Bed Cnt`, Surgeries = `Surgeries Cnt`) %>%
+  select(-c(Address)) %>% 
+    mutate( n_filled = rowSums(!is.na(.) & trimws(as.character(.)) != "") ) %>%
+  group_by(customer_cd) %>%
+  slice_max(n_filled, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  select(-n_filled) %>% arrange(desc(`Beds`))
+  
+writexl::write_xlsx(x=switchers_det, path ="E:\\ARC\\Projects\\LTOWB PLT RBC\\ltowb\\switchers_details.xlsx")
+download_file( 
+  path = "E:\\ARC\\Projects\\LTOWB PLT RBC\\ltowb\\switchers_details.xlsx",
+  output_name = "Details of Hospitals_w_LTOWB_2to5",
+  button_label = "download hospital details" ,
+  button_type = "info",
+  has_icon = TRUE,
+  self_contained = TRUE
+  )
+
+# switchers %>%
+#   select(customer_cd, master_customer_nm, less_than_2pct, greater_than_5pct, switch_year) %>%
+#   rename(
+#     `<2% LTOWB` = less_than_2pct,
+#     `>5% LTOWB` = greater_than_5pct
+#   ) %>%
+#   kable(
+#     caption = "Hospitals Switching from <2% to >5% LTWOB Usage",
+#     booktabs = TRUE
+#   ) %>%
+#   kable_styling(
+#     font_size = 14,        # << REDUCE FONT SIZE
+#     full_width = FALSE,
+#     position = "center"
+#   )
+
+
+switchers_det %>% gt() %>% 
+  tab_header(title = "Table 1. Hospitals with LTOWB% from 2% or less to 5% or greater",
+             subtitle = "arranged in descending order of bed size") %>%
+  cols_label(customer_cd = "Hospital Code") %>%
+  tab_spanner(label = "Hospital Characrteristics", columns = c(`Cancer Ctr`,`Trauma Ctr`, `Beds`, `Surgeries`, `Switch Yr.`)) %>%
+  tab_spanner(label = "Hospital Location", columns = c(`Hospital`,`City`, `State`, `Zip`)) %>%
+  cols_align("left", columns = everything()) %>%
+  tab_options(table.border.left.color = "white",
+              table.border.right.color = "white",
+              table_body.hlines.color = "gray") %>%
+  theme_gt_compact() %>%
+  tab_options(data_row.padding = px(1), column_labels.padding = px(1)) %>%
+  # tab_style(style = list(cell_fill(color = "#f3f5f0")), locations = cells_body(rows = cluster == "Low penetration")) %>%
+  # tab_style(style = list(cell_fill(color = "#fffbbf")), locations = cells_body(rows = cluster == "Moderate penetration")) %>%
+  # tab_style(style = list(cell_fill(color = "#ddf5bf")), locations = cells_body(rows = cluster == "High penetration")) %>%
+  tab_footnote("") %>%
+  cols_width(
+    customer_cd  ~px(87),
+    Hospital ~ px(280),
+    City     ~ px(97),
+    State    ~ px(30),
+    Zip ~ px(40),
+    `Cancer Ctr` ~ px(65),
+    `Trauma Ctr`    ~ px(70),
+    Beds    ~ px(40),
+    Surgeries ~ px(90),
+    `Switch Yr.` ~ px(60),
+    # contact ~ px(100),
+    everything() ~ px(5)
+  ) |>
+  tab_options(table.font.size = px(12)) |>
+tab_options(
+    table.width = pct(100)
+  )
+```
+
+
+##### Hospital switch map
+```{r warning=FALSE, message=FALSE, echo=FALSE, fig.width=12, fig.height=7}
+library(dplyr)
+library(leaflet)
+library(htmltools)
+
+hospital_switch_map <- tibble::tribble(
+  ~hospital_code, ~hospital, ~city, ~state, ~switch_yr,
+  "N038B7RILE", "METHODIST HOSPITAL", "INDIANAPOLIS", "IN", 2024,
+  "N02920010", "ECU HEALTH", "GREENVILLE", "NC", 2024,
+  "N003B1GRAD", "GRADY MEMORIAL HOSPITAL-ATLANTA", "ATLANTA", "GA", 2024,
+  "N0122420", "WAKE FOREST BAPTIST MEDICAL CENTER", "WINSTON SALEM", "NC", 2024,
+  "N022XAG", "LEHIGH VALLEY CEDAR CREST", "ALLENTOWN", "PA", 2025,
+  "N029CHIPEN", "HCA-CHIPPENHAM HOSPITAL", "RICHMOND", "VA", 2025,
+  "N009N8UCMC", "UCHEALTH UNIVERSITY OF COLORADO HOSPITAL", "DENVER", "CO", 2020,
+  "N0041074", "BOSTON MEDICAL CENTER", "BOSTON", "MA", 2024,
+  "N021P00001", "OHSU HOSPITAL", "PORTLAND", "OR", 2023,
+  "N030B12001", "GEISINGER MEDICAL CENTER - DANVILLE", "DANVILLE", "PA", 2024,
+  "N009N8DHMC", "DENVER HEALTH MEDICAL CENTER", "DENVER", "CO", 2023,
+  "N024000425", "UNIVERSITY OF LOUISVILLE HOSPITAL ULH", "LOUISVILLE", "KY", 2024,
+  "N020S98MDH", "MCKAY-DEE HOSPITAL CENTER", "OGDEN", "UT", 2024,
+  "N003B1SCOT", "CHILDREN'S HEALTHCARE OF ATLANTA-SCOTTISH RITE", "ATLANTA", "GA", 2025,
+  "N017EUCL", "MAYO CLINIC HEALTH SYSTEM EAU CLAIRE", "EAU CLAIRE", "WI", 2024,
+  "N02933025", "NAVAL MEDICAL CENTER PORTSMOUTH", "PORTSMOUTH", "VA", 2024,
+  "N030B48001", "GEISINGER WYOMING VALLEY MEDICAL CENTER", "WILKES BARRE", "PA", 2024,
+  "N020S98DRM", "ST GEORGE REGIONAL MEDICAL CENTER", "ST GEORGE", "UT", 2023,
+  "N020B5STAH", "SAINT ALPHONSUS MEDICAL GROUP NAMPA", "NAMPA", "ID", 2024,
+  "N020S98UVR", "UTAH VALLEY HOSPITAL", "PROVO", "UT", 2023
+)
+
+state_lookup <- tibble::tibble(
+  state = state.abb,
+  region = tolower(state.name),
+  center_x = state.center$x,
+  center_y = state.center$y
+)
+
+hospital_map_df <- hospital_switch_map %>%
+  left_join(state_lookup, by = "state") %>%
+  group_by(state) %>%
+  arrange(switch_yr, hospital, .by_group = TRUE) %>%
+  mutate(
+    hospitals_in_state = n(),
+    hospital_rank = row_number(),
+    angle = if_else(
+      hospitals_in_state == 1,
+      0,
+      2 * pi * (hospital_rank - 1) / hospitals_in_state
+    ),
+    lon = center_x + 1.6 * cos(angle),
+    lat = center_y + 1.1 * sin(angle)
+  ) %>%
+  ungroup() %>%
+  mutate(
+    switch_yr = factor(switch_yr, levels = c(2020, 2023, 2024, 2025)),
+    popup = paste0(
+      "<b>", htmlEscape(hospital), "</b><br/>",
+      "Hospital Code: ", htmlEscape(hospital_code), "<br/>",
+      "City: ", htmlEscape(city), "<br/>",
+      "State: ", htmlEscape(state), "<br/>",
+      "Switch Yr: ", htmlEscape(as.character(switch_yr))
+    ),
+    label = paste0(hospital, " (", state, ")")
+  )
+
+switch_pal <- colorFactor(
+  palette = c(
+    "2020" = "#1b9e77",
+    "2023" = "#d95f02",
+    "2024" = "#7570b3",
+    "2025" = "#e7298a"
+  ),
+  domain = hospital_map_df$switch_yr
+)
+
+leaflet(hospital_map_df, options = leafletOptions(zoomSnap = 0.25, zoomDelta = 0.25)) %>%
+  addProviderTiles(providers$CartoDB.PositronNoLabels) %>%
+  setView(lng = -98.5, lat = 38.5, zoom = 4) %>%
+  addCircleMarkers(
+    lng = ~lon,
+    lat = ~lat,
+    radius = 7,
+    stroke = TRUE,
+    weight = 1,
+    color = "#FFFFFF",
+    fillColor = ~switch_pal(switch_yr),
+    fillOpacity = 0.9,
+    popup = ~popup,
+    label = ~label
+  ) %>%
+  addLabelOnlyMarkers(
+    data = state_lookup %>% semi_join(hospital_switch_map, by = "state"),
+    lng = ~center_x,
+    lat = ~center_y,
+    label = ~state,
+    labelOptions = labelOptions(
+      noHide = TRUE,
+      direction = "center",
+      textOnly = TRUE,
+      style = list(
+        "color" = "#7a7a7a",
+        "font-size" = "11px",
+        "font-weight" = "600"
+      )
+    )
+  ) %>%
+  addLegend(
+    position = "bottomright",
+    pal = switch_pal,
+    values = ~switch_yr,
+    title = "Switch Yr",
+    opacity = 0.95
+  )
+```
+
+- This map is interactive in the HTML output: click a circle to see the hospital name, code, city, state, and `Switch Yr`.
+- Hospitals are still positioned by state, with small offsets within the same state so overlapping sites remain clickable.
+
+##### Trajectory by hospitals  
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+unlink("trelliscope_ltowb", recursive = TRUE)
+
+remove(switcher_details)
+switcher_details <- hosp %>%
+  semi_join(switchers, by = "customer_cd") %>%
+  arrange(customer_cd, calendar_yr) %>%
+  select(customer_cd, master_customer_nm, calendar_yr, ltwobcat, ltwobp)
+
+switcher_details <- switcher_details %>%
+  mutate('H' = paste0(customer_cd, " — ", master_customer_nm))
+
+# install.packages("trelliscopejs")
+remotes::install_github("hafen/trelliscopejs")
+library(trelliscopejs)
+library(tidyr)
+library(purrr)
+# Create a plotting function for each hospital
+# plot_ltowb <- function(df) {
+#   ggplot(df, aes(x = calendar_yr, y = ltwobp, color = ltwobcat)) +
+#     geom_line(linewidth = 1) +
+#     geom_point(size = 2) +
+#     scale_x_continuous(breaks = df$calendar_yr) +
+#     scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+#     scale_color_manual(values = c("<2.5" = "gray20",
+#                                   "2.5-5.0" = "gray50",
+#                                   ">5" = "gray80")) +
+#     labs(
+#       title = unique(df$customer_cd),
+#       x = "Year",
+#       y = "LTOWB (%)",
+#       color = "Category"
+#     ) +
+#     theme_minimal(base_size = 11) +
+#     theme(legend.position = "bottom")
+# }
+
+# 2: Proper trelliscope call
+# switcher_details %>%
+#   group_by(customer_cd) %>%
+#   nest() %>%
+#   trelliscopejs::trelliscope(
+#     name = "LTOWB Trends by Hospital",
+#     path = "trelliscope_ltowb",
+#     panelFn = function(x) plot_ltowb(x$data),
+#     cogFn = function(x) {
+#       tibble(
+#         first_year = min(x$data$calendar_yr),
+#         last_year  = max(x$data$calendar_yr),
+#         max_ltwobp = max(x$data$ltwobp, na.rm = TRUE)
+#       )
+#     },
+#     nrow = 2,
+#     ncol = 2
+#   )
+
+
+# Plot LTOWB% vs Year using facet_trelliscope
+library(trelliscopejs)
+library(scales)
+
+switcher_details %>%
+  ggplot(aes(x = calendar_yr, y = ltwobp, color = ltwobcat)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  scale_x_continuous(breaks = sort(unique(switcher_details$calendar_yr))) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  scale_color_manual(values = c("<2"="gray20","2-5"="gray50",">5"="gray80")) +
+  labs(x = "Year", y = "LTOWB (%)", color = "Category") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom") +
+  facet_trelliscope(
+    ~ H,
+    nrow = 1,
+    ncol = 2,
+    path = "trelliscope_ltowb"
+  )
+```
+
+- **Hospital‑Level Trends in Low‑Titer Whole Blood (LTWOB) Use, 2018–2025**
+
+##### Hospital Counts: <2% to >5% LTOWB use  
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+switch_year_counts <- switchers %>%
+  count(switch_year, name = "n_hospitals_switched")
+
+n = max(switch_year_counts$n_hospitals_switched) + 2
+ggplot(switch_year_counts,
+       aes(x = switch_year, y = n_hospitals_switched)) +
+  geom_col(fill = "gray40") +
+  geom_text(aes(label = n_hospitals_switched),
+            vjust = -0.5) +
+  labs(
+    title = "Count of Hospitals Increasing LTOWB usage from <2% to >5% by Year",
+    x = "Year",
+    y = "Number of switching hospitals"
+  ) + scale_y_continuous(breaks = scales::pretty_breaks(), limits = c(0, n)) +
+  theme_pubclean(base_size = 13) +
+  theme(plot.title = element_text(size = 14) )
+
+```
+
+- Across the study period, several hospitals transitioned from low LTWOB utilization 
+(<2%) to high utilization (>5%). 
+- These transitions occurred predominantly after 2023, 
+consistent with the system‑level increase in hospitals adopting higher LTWOB usage in later years 
+
+
+#### Hospitals without increase in LTOWB use{.tabset #csp-down}
+##### <2% hospital list
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+less_than_2perc <- hosp %>%
+  group_by(customer_cd) %>%
+  summarise(
+    max_ltwobp = max(ltwobp, na.rm = TRUE),
+    always_less_2 = max_ltwobp < 2,
+    .groups = "drop"
+  ) %>%
+  filter(always_less_2)
+
+hospdetails <- read_excel('E:\\ARC\\Projects\\Tim\\csp\\hospitals.xlsx') 
+hospdetails <- hospdetails %>% select("Customer Key","Customer Cd" , "Customer Nm", 
+                                      "Ship To Addr1","Ship To City","Ship To State" ,"Ship To Zip","Master Customer Cd","Master Customer Nm", 
+                                      "Bed Cnt","Surgeries Cnt","cancer_ctr_flg","trauma_ctr_flg"
+)
+
+
+hospdetails <- hospdetails %>%
+  mutate(`Ship To Zip` = stringr::str_pad(`Ship To Zip`, width = 5, side = "left", pad = "0"))
+
+
+less_than_2perc_details <- less_than_2perc %>%
+  left_join(hospdetails, by = c("customer_cd" = "Customer Cd")) 
+
+lt2perc_details <- less_than_2perc_details %>%
+  mutate(
+    n_filled = rowSums(!is.na(.) & trimws(as.character(.)) != "")
+  ) %>%
+  group_by(customer_cd) %>%
+  slice_max(n_filled, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  select(-n_filled)
+
+
+list2 <- lt2perc_details %>% 
+  select("customer_cd","Master Customer Nm","Ship To Addr1","Ship To City","Ship To State", 
+         "Ship To Zip","cancer_ctr_flg","trauma_ctr_flg","Bed Cnt","Surgeries Cnt","max_ltwobp") %>%
+  rename( "Hospital ID" = "customer_cd",
+          "Hospital" = "Master Customer Nm", 
+          "City"  =  "Ship To City"  ,
+          "State" =  "Ship To State",
+          "Zip"  =  "Ship To Zip"  ,
+          "Cancer Ctr"  = "cancer_ctr_flg",
+          "Trauma Ctr"=  "trauma_ctr_flg",
+          "Beds"=  "Bed Cnt"      ,
+          "Surgeries"= "Surgeries Cnt",
+          "Max LTOWB%" = "max_ltwobp"
+  ) |>
+  distinct() |>
+  arrange(desc(Beds))
+
+writexl::write_xlsx(x=list2, path ="E:\\ARC\\Projects\\LTOWB PLT RBC\\ltowb\\list2.xlsx")
+download_file( 
+  path = "E:\\ARC\\Projects\\LTOWB PLT RBC\\ltowb\\list2.xlsx",
+  output_name = "Hospitals_w_LTOWB_2orbelow",
+  button_label = "download data (Excel)" ,
+  button_type = "info",
+  has_icon = TRUE,
+  self_contained = TRUE
+)
+
+list2 %>% select(-c("Ship To Addr1")) %>%
+  gt() %>% 
+  tab_header(title = "Table 2. Hospitals with LTOWB% below 2%",
+             subtitle = "arranged in descending order of bed size") %>%
+  tab_spanner(label = "Hospital Details", columns = c(`Cancer Ctr`,`Trauma Ctr`, `Beds`, `Surgeries`, "Max LTOWB%")) %>%
+  cols_align("left", columns = everything()) %>%
+  tab_options(table.border.left.color = "white",
+              table.border.right.color = "white",
+              table_body.hlines.color = "gray") %>%
+  theme_gt_compact() %>%
+  tab_options(data_row.padding = px(1), column_labels.padding = px(1)) %>%
+  # tab_style(style = list(cell_fill(color = "#f3f5f0")), locations = cells_body(rows = cluster == "Low penetration")) %>%
+  # tab_style(style = list(cell_fill(color = "#fffbbf")), locations = cells_body(rows = cluster == "Moderate penetration")) %>%
+  # tab_style(style = list(cell_fill(color = "#ddf5bf")), locations = cells_body(rows = cluster == "High penetration")) %>%
+  tab_footnote("") %>%
+  cols_width(
+    `Hospital ID`  ~px(87),
+    Hospital ~ px(200),
+    City     ~ px(97),
+    State    ~ px(30),
+    Zip ~ px(50),
+    `Cancer Ctr` ~ px(65),
+    `Trauma Ctr`    ~ px(70),
+    Beds    ~ px(40),
+    Surgeries ~ px(90),
+    # contact ~ px(100),
+    everything() ~ px(70)
+  ) |>
+  tab_options(table.font.size = px(11)) |>
+  tab_options(
+    table.width = pct(100)
+  )
+```
+
+##### <2% hospital map
+```{r warning=FALSE, message=FALSE, echo=FALSE, fig.width=12, fig.height=7}
+library(dplyr)
+library(leaflet)
+library(htmltools)
+
+state_lookup_lt2 <- tibble::tibble(
+  state = state.abb,
+  center_x = state.center$x,
+  center_y = state.center$y
+)
+
+lt2_map_df <- list2 %>%
+  rename(
+    hospital_id = `Hospital ID`,
+    hospital = Hospital,
+    city = City,
+    state = State,
+    zip = Zip,
+    cancer_ctr = `Cancer Ctr`,
+    trauma_ctr = `Trauma Ctr`,
+    beds = Beds,
+    surgeries = Surgeries,
+    max_ltwob = `Max LTOWB%`
+  ) %>%
+  left_join(state_lookup_lt2, by = "state") %>%
+  group_by(state) %>%
+  arrange(desc(max_ltwob), hospital, .by_group = TRUE) %>%
+  mutate(
+    hospitals_in_state = n(),
+    hospital_rank = row_number(),
+    angle = if_else(
+      hospitals_in_state == 1,
+      0,
+      2 * pi * (hospital_rank - 1) / hospitals_in_state
+    ),
+    lon = center_x + 1.6 * cos(angle),
+    lat = center_y + 1.1 * sin(angle)
+  ) %>%
+  ungroup() %>%
+  mutate(
+    popup = paste0(
+      "<b>", htmlEscape(hospital), "</b><br/>",
+      "Hospital ID: ", htmlEscape(as.character(hospital_id)), "<br/>",
+      "City: ", htmlEscape(as.character(city)), "<br/>",
+      "State: ", htmlEscape(as.character(state)), "<br/>",
+      "Zip: ", htmlEscape(as.character(zip)), "<br/>",
+      "Cancer Ctr: ", htmlEscape(as.character(cancer_ctr)), "<br/>",
+      "Trauma Ctr: ", htmlEscape(as.character(trauma_ctr)), "<br/>",
+      "Beds: ", htmlEscape(as.character(beds)), "<br/>",
+      "Surgeries: ", htmlEscape(as.character(surgeries)), "<br/>",
+      "Max LTOWB%: ", sprintf("%.2f", max_ltwob)
+    ),
+    label = paste0(hospital, " (", state, ")")
+  )
+
+lt2_pal <- colorNumeric(
+  palette = "Blues",
+  domain = lt2_map_df$max_ltwob,
+  na.color = "#bdbdbd"
+)
+
+leaflet(lt2_map_df, options = leafletOptions(zoomSnap = 0.25, zoomDelta = 0.25)) %>%
+  addProviderTiles(providers$CartoDB.PositronNoLabels) %>%
+  setView(lng = -98.5, lat = 38.5, zoom = 4) %>%
+  addCircleMarkers(
+    lng = ~lon,
+    lat = ~lat,
+    radius = 7,
+    stroke = TRUE,
+    weight = 1,
+    color = "#FFFFFF",
+    fillColor = ~lt2_pal(max_ltwob),
+    fillOpacity = 0.9,
+    popup = ~popup,
+    label = ~label
+  ) %>%
+  addLabelOnlyMarkers(
+    data = state_lookup_lt2 %>% semi_join(lt2_map_df, by = "state"),
+    lng = ~center_x,
+    lat = ~center_y,
+    label = ~state,
+    labelOptions = labelOptions(
+      noHide = TRUE,
+      direction = "center",
+      textOnly = TRUE,
+      style = list(
+        "color" = "#7a7a7a",
+        "font-size" = "11px",
+        "font-weight" = "600"
+      )
+    )
+  ) %>%
+  addLegend(
+    position = "bottomright",
+    pal = lt2_pal,
+    values = ~max_ltwob,
+    title = "Max LTOWB%",
+    opacity = 0.95
+  )
+```
+
+- This interactive map shows hospitals that remained below 2% LTOWB use across the study period.
+- Click any circle to view the hospital name and details from the `<2% hospital list`; circle color reflects each hospital's `Max LTOWB%`.
+
+
+##### <2% hospital trajectory
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+less_than_2perc_long <- hosp %>%
+  semi_join(less_than_2perc, by = "customer_cd") %>%
+  arrange(customer_cd, calendar_yr) %>%
+  select(customer_cd, master_customer_nm, calendar_yr, ltwobp, ltwobcat)
+
+library(trelliscopejs)
+
+less_than_2perc_long %>%
+  mutate(panel_label = paste0(customer_cd, " — ", master_customer_nm)) %>%
+  ggplot(aes(calendar_yr, ltwobp)) +
+  geom_line() +
+  geom_point() +
+  theme_minimal() +
+  facet_trelliscope(~ panel_label,
+                    nrow = 2, ncol = 3,
+                    path = "trelliscope_low_ltowb")
+
+```
+
+
+### Median PLT:RBC by LTWOB%
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+# Summarize: mean and SE (cluster-robust CIs optional in B)
+summary_by_year <- df %>%
+  group_by(ltwobcat, calendar_yr) %>%
+  summarise(
+    n = n(),
+    median_pltrbc = median(pltrbcratio, na.rm = TRUE),
+    sd_pltrbc = sd(pltrbcratio, na.rm = TRUE),
+    se_pltrbc = sd_pltrbc / sqrt(n),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    ci_l = median_pltrbc - qt(0.975, pmax(n-1,1)) * se_pltrbc,
+    ci_u = median_pltrbc + qt(0.975, pmax(n-1,1)) * se_pltrbc
+  )
+
+# Line with points and ribbons by category
+ggplot(summary_by_year,
+       aes(x = calendar_yr, y = median_pltrbc, color = ltwobcat, group = ltwobcat)) +
+  # geom_ribbon(aes(ymin = ci_l, ymax = ci_u, fill = ltwobcat),
+  #             color = NA, alpha = 0.12, show.legend = FALSE) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  scale_x_continuous(breaks = sort(unique(summary_by_year$calendar_yr))) +
+  labs(
+    x = "Calendar year",
+    y = "PLT:RBC ratio",
+    color = "LTWOB %usage",
+    title = "Figure 1. Change in PLT:RBC ratio by LTWOB category over time (descriptive medians)"
+  ) +
+  theme_pubclean(base_size = 12) +
+  ylim(0,1.2)
+```
+
+- Across eight years of observation, only hospitals with >5% LTWOB usage demonstrated a substantial temporary rise in PLT:RBC ratios, peaking in 2020, with subsequent decline and convergence toward the lower utilization categories by 2023–2025.
+- These descriptive patterns suggest early implementation‑related variability in high‑LTWOB hospitals, with stabilization of transfusion ratios over time.
+  + *Note: These values represent descriptive medians and do not reflect model‑adjusted estimates or tests of statistical significance.*
+
+
+### PLT:RBC by year by LTOWB use{.tabset}
+#### Mixed model: Random intercept for hospital
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+library(pbkrtest)
+hosp <- hosp %>%
+  mutate(
+    year_f = factor(calendar_yr),              # like calendar_yr_c in SAS
+    customer_cd = factor(customer_cd)
+  )
+
+#Fit linear mixed model (Gaussian, identity link; REML ~ PROC MIXED default)
+m <- lmer(pltrbcratio ~ ltwobcat * year_f + (1 | customer_cd), data = hosp, REML = TRUE)
+
+#--- Global Type III tests (focus on the interaction)
+a <- anova(m, type = 3, ddf = "Kenward-Roger") #If pbkrtest is not installed, lmerTest will fall back to Satterthwaite
+
+# Replace row names with publication‑ready labels
+rownames(a) <- c("LTWOB category",
+                 "Calendar year",
+                 "LTWOB category × year")
+
+a
+```
+
+- A linear mixed model (hospital random intercept) showed a highly significant 
+**LTWOB category × year** interaction (p < 1.3e-33), 
+  + indicating that differences in PLT:RBC ratio across LTWOB adoption levels 
+    changed substantially over time.
+- Main effects for **year** (p < 10⁻⁹) and **LTWOB** category (p = 0.019) were also significant, 
+but are not interpreted because of the strong interaction.
+
+#### Within-year tests
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+# ======================================================
+# 4) Within-year tests: Do LTWOB categories differ *in each year*?
+#    Tukey-adjusted pairwise differences and overall F per year
+# ======================================================
+emm <- emmeans(m, ~ ltwobcat | year_f)   # LS-means by category within each year
+# Tukey-adjusted pairwise comparisons within each year
+pw <- pairs(emm, adjust = "tukey")
+
+# Convert to clean data frame
+pw_df <- as.data.frame(pw)
+
+library(knitr)
+remotes::install_github("haozhu233/kableExtra")
+library(kableExtra)
+# Clean and format the output
+pw_clean <- pw_df %>%
+  mutate(
+    Year     = as.character(year_f),
+    Contrast = contrast,
+    Estimate = ifelse(is.na(estimate), "nonEst", sprintf("%.3f", estimate)),
+    SE       = ifelse(is.na(SE),       "NA",     sprintf("%.3f", SE)),
+    DF       = ifelse(is.na(df),       "NA",     sprintf("%.0f", df)),
+    t_ratio  = ifelse(is.na(t.ratio),  "NA",     sprintf("%.2f", t.ratio)),
+    p_value  = ifelse(
+                  is.na(p.value), 
+                  "NA",
+                  ifelse(p.value < 0.0001,
+                         "<0.0001",
+                         sprintf("%.4f", p.value)))
+  ) %>%
+  select(Year, Contrast, Estimate, SE, DF, t_ratio, p_value)
+
+# Render as formatted publication-style table
+pw_clean %>%
+  kable(
+    caption = "Tukey-adjusted pairwise differences in PLT:RBC ratio by LTWOB category within each calendar year.",
+    booktabs = TRUE,
+    align = "lcccccc"
+  ) %>%
+  kable_styling(
+    full_width = FALSE,
+    position = "center",
+    bootstrap_options = c("striped", "hover", "condensed")
+  ) %>%
+  collapse_rows(columns = 1, valign = "top")
+
+```
+
+- The output shows within‑year comparisons among the 3 LTWOB categories:
+  + '<2% LTOWB use'
+  + '2.5–5.0% LTOWB use'
+  + '>5% LTOWB use'
+ 
+- These are LS‑mean (model‑adjusted) differences in PLT:RBC ratio, computed separately for each year.
+  + The Tukey method adjusts for the 3 comparisons within each year.
+  
+- **2018**: No estimable comparisons.
+- **2019**: No differences.
+- **2020**: highly significant spike in the >5 category vs both other groups.
+  + <2 and 2.5–5.0 do not differ (p ≈ 0.99).
+  + Both are dramatically lower than >5 (difference ≈ −3.0 units, p < 0.0001).
+  + **Conclusion (2020)**: The hospitals with >5% LTOWB usage have significantly higher PLT:RBC than both other LTWOB groups.
+- **2021**: No differences.
+- **2022**: *Reverse effect*: >5 category now has significantly lower PLT:RBC ratio than both 2.5–5.0 and <2.
+<2 and 2.5–5.0 do not differ significantly. Both have significantly higher PLT:RBC ratio than the >5 category.
+**Conclusion:** A reversal compared to 2020. Now hospitals with >5% LTOWB usage have significantly lower PLT:RBC ratio.
+- **2023–2025**: No meaningful differences; groups converge in 2023; LTWOB categories remain similar 
+
+### Model-adjusted means 
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+emm_df <- as.data.frame(emm) %>%
+  rename(emmean = emmean, lower = lower.CL, upper = upper.CL) %>%
+  mutate(calendar_yr = as.integer(as.character(year_f)))
+
+ggplot(emm_df, aes(calendar_yr, emmean, color = ltwobcat, group = ltwobcat)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.15, alpha = 0.7) +
+  scale_color_manual(values = c("<2"="#e15759","2-5"="#59a14f",">5"="#4e79a7"),
+                     name = "LTWOB category") +
+  scale_x_continuous(breaks = sort(unique(emm_df$calendar_yr))) +
+  labs(
+    title = "Figure 2. Adjusted PLT:RBC ratio between hospitals categorized by LTWOB % over time (mixed model LS-means)",
+    x = "Calendar year", y = "Adjusted PLT:RBC ratio (LS-mean)"
+  ) +
+  theme_pubclean(base_size = 13) +
+  theme(legend.position = "top")
+```
+
+
+- **Comparision with the Raw Descriptive Medians (Unadjusted) in Figure 1**
+- Figure 1 displays simple medians of the observed PLT:RBC ratio within each LTWOB category and year, without adjusting for:
+  + differences in hospital size
+  + differences in case mix
+  + differences in hospital‑level random effects (baseline transfusion tendency)
+  + imbalance in the number of hospitals per category
+  + changes in category membership over time
+- Because these medians reflect the observed distribution only, they are susceptible to:
+  + influence of a few hospitals with unusually high ratios in that year
+  + differences in which hospitals fall into each LTWOB category each year
+  + uneven sample sizes across categories
+  + regression dilution or skewed distributions
+- Thus, Figure 1 is based on the data as it is, before accounting for clustering and model structure.
+
+- **Figure 2** above is the Model‑Adjusted LS‑means (Mixed Model)
+  + displays the least‑squares means from a linear mixed‑effects model with:
+    * hospital random intercepts (accounting for repeated measures and baseline differences),
+    * a LTWOB category × year interaction,
+    * and adjustment for the unbalanced structure of the data.
+
+- Therefore, the LS‑means represent the expected PLT:RBC ratio for each category and year after controlling for hospital‑level variability.
+- This modeling makes important changes:
+  + Removes influence of hospitals with unusually high or low raw values
+    * 2022 may contain hospitals with extreme ratios in certain LTWOB categories.
+    * Random effects shrink those extremes toward the group mean.
+  + Adjusts for differences in the number of hospitals per category
+    * If 2022 has fewer hospitals in the >5% category, the LS‑mean is estimated with more shrinkage and may differ from the raw median.
+- Corrects for category switching
+  + If some hospitals moved between LTWOB categories from 2020 → 2022, the unadjusted medians reflect this churn, but the mixed model handles repeated measures appropriately.
+
+- The >5% category shows a markedly lower adjusted mean in 2022, dropping below both <2% and 2.5–5.0%.
+- The 2.5–5.0% group appears elevated relative to others, with wide confidence intervals.
+- In 2022, the mixed model identifies hospital‑level heterogeneity that the raw medians cannot correct for:
+  + Hospitals in the >5% category may have negative random effects (lower baselines), pulling their LS‑mean down.
+  + Hospitals in the 2.5–5% category may have positive random effects or greater stability, elevating their LS‑mean.
+  +Observed medians in 2022 may be influenced by 1–2 hospitals with extreme values; the model reduces their influence.
+
+**Thus, the unadjusted Figure 1 reflects what was observed in 2022, while the adjusted Figure 2 reflects the estimated values after accounting for differences between hospitals, repeated measures, and unbalanced categories.**
+
+
+### Effect sizes{.tabset}
+#### Effect sizes as differences vs a reference category by year{.tabset}
+##### ">5 minus <2"
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+ref_contr <- contrast(emm, method = list(">5 minus <2" = c(-1, 0, 1)), adjust = "none")
+res <- summary(ref_contr, infer = TRUE)
+
+res_clean <- as.data.frame(res) %>%
+  dplyr::select(
+    Year = year_f,
+    Contrast = contrast,
+    Estimate = estimate,
+    Lower.CL = lower.CL,
+    Upper.CL = upper.CL,
+    P.value = p.value
+  )
+
+res_clean <- res_clean %>%
+  mutate(
+    Estimate = ifelse(is.na(Estimate), "nonEst", sprintf("%.3f", Estimate)),
+    Lower.CL = ifelse(is.na(Lower.CL), "NA", sprintf("%.3f", Lower.CL)),
+    Upper.CL = ifelse(is.na(Upper.CL), "NA", sprintf("%.3f", Upper.CL)),
+    P.value  = ifelse(
+                 is.na(P.value), "NA",
+                 ifelse(P.value < 0.0001, "<0.0001", sprintf("%.4f", P.value))
+               )
+  )
+
+res_clean %>%
+  kable(
+    caption = "Adjusted Difference (>5% minus 2.5–5%) in PLT:RBC Ratio by Year",
+    booktabs = TRUE,
+    align = "lcccccc"
+  ) %>%
+  kable_styling(
+    full_width = FALSE,
+    position = "center",
+    bootstrap_options = c("striped", "hover", "condensed")
+  ) %>%
+  collapse_rows(columns = 1, valign = "top")
+```
+
+
+- These estimates represent adjusted mean differences in PLT:RBC ratio between hospitals with >5% LTWOB 
+usage and those with <2%, generated from a linear mixed model including a hospital‑level random intercept 
+and a LTWOB category × year interaction. 
+  + Positive values indicate higher PLT:RBC ratios in the >5% group; 
+  + Negative values indicate lower ratios. 
+  + Confidence intervals are 95%, with Kenward–Roger degrees of freedom.
+  + The adjusted difference in PLT:RBC ratio between hospitals with >5% versus <2% 
+  + LTWOB utilization varied substantially over time. 
+
+- A pronounced elevation in the >5% group was observed in 2020 (difference, 3.03; p < 0.0001), representing a strong 
+early divergence in component use.
+- By 2022, this pattern reversed, with the >5% group demonstrating significantly lower adjusted ratios 
+(difference, −0.90; p = 0.012).
+- No significant differences were observed in 2019 or 2021, nor in 2023–2025, indicating a return to alignment 
+across LTWOB categories in later years.
+- The adjusted difference in PLT:RBC ratio between hospitals with >5% and <2 LTWOB utilization varied 
+substantially over time (significant interaction). A marked elevation in PLT:RBC ratio was observed 
+among >5% hospitals in 2020, with adjusted differences exceeding 3 units compared with the <2% group (p < 0.0001).
+- By 2022, this pattern reversed, with the >5% group demonstrating significantly lower adjusted ratios 
+(difference ≈ −0.9; p = 0.01).
+- For all subsequent years (2023–2025), the categories showed no meaningful differences, with point estimates clustered near zero.
+
+##### ">5 minus 2.5-5"
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+ref_contr <- contrast(emm, method = list(">5 minus 2.5-5" = c(0, -1, 1)), adjust = "none")
+
+res <- summary(ref_contr, infer = TRUE)
+
+res_clean <- as.data.frame(res) %>%
+  dplyr::select(
+    Year = year_f,
+    Contrast = contrast,
+    Estimate = estimate,
+    Lower.CL = lower.CL,
+    Upper.CL = upper.CL,
+    P.value = p.value
+  )
+
+res_clean <- res_clean %>%
+  mutate(
+    Estimate = ifelse(is.na(Estimate), "nonEst", sprintf("%.3f", Estimate)),
+    Lower.CL = ifelse(is.na(Lower.CL), "NA", sprintf("%.3f", Lower.CL)),
+    Upper.CL = ifelse(is.na(Upper.CL), "NA", sprintf("%.3f", Upper.CL)),
+    P.value  = ifelse(
+                 is.na(P.value), "NA",
+                 ifelse(P.value < 0.0001, "<0.0001", sprintf("%.4f", P.value))
+               )
+  )
+
+res_clean %>%
+  kable(
+    caption = "Adjusted Difference (>5% minus 2.5–5%) in PLT:RBC Ratio by Year",
+    booktabs = TRUE,
+    align = "lcccccc"
+  ) %>%
+  kable_styling(
+    full_width = FALSE,
+    position = "center",
+    bootstrap_options = c("striped", "hover", "condensed")
+  ) %>%
+  collapse_rows(columns = 1, valign = "top")
+```
+
+- The adjusted difference in PLT:RBC ratio between hospitals with >5% and 2.5–5% LTWOB utilization varied 
+substantially over time (significant interaction). A marked elevation in PLT:RBC ratio was observed 
+among >5% hospitals in 2020, with adjusted differences exceeding 3 units compared with the 2.5–5% group (p < 0.0001).
+- A pronounced elevation in the >5% group was observed in 2020 (difference, 3.06; p < 0.0001), representing a strong 
+early divergence in component use.
+- By 2022, this pattern reversed, with the >5% group demonstrating significantly lower adjusted ratios 
+(difference, −1.47; p = 0.003).
+- No significant differences were observed in 2019 or 2021, nor in 2023–2025, indicating a return to alignment 
+across LTWOB categories in later years.
+- For all subsequent years (2023–2025), the categories showed no meaningful differences, with point estimates clustered near zero.
+> Temporal fluctuations in PLT:RBC ratio among hospitals with higher LTWOB usage suggest early variability in transfusion 
+practices during whole‑blood program rollout, followed by stabilization and convergence across hospitals in subsequent years.

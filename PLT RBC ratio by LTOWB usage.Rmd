@@ -151,6 +151,112 @@ output:
 Temporal Patterns in Platelet‑to‑Red Cell Transfusion Ratios Across Hospitals With Varying LTOWB Utilization
 </h2>
 ## Analysis{.tabset .tabset-fade .tabset-pills}
+### Hospital switch map
+```{r warning=FALSE, message=FALSE, echo=FALSE, fig.width=12, fig.height=7}
+library(dplyr)
+library(ggplot2)
+library(maps)
+
+hospital_switch_map <- tibble::tribble(
+  ~hospital_code, ~hospital, ~city, ~state, ~switch_yr,
+  "N038B7RILE", "METHODIST HOSPITAL", "INDIANAPOLIS", "IN", 2024,
+  "N02920010", "ECU HEALTH", "GREENVILLE", "NC", 2024,
+  "N003B1GRAD", "GRADY MEMORIAL HOSPITAL-ATLANTA", "ATLANTA", "GA", 2024,
+  "N0122420", "WAKE FOREST BAPTIST MEDICAL CENTER", "WINSTON SALEM", "NC", 2024,
+  "N022XAG", "LEHIGH VALLEY CEDAR CREST", "ALLENTOWN", "PA", 2025,
+  "N029CHIPEN", "HCA-CHIPPENHAM HOSPITAL", "RICHMOND", "VA", 2025,
+  "N009N8UCMC", "UCHEALTH UNIVERSITY OF COLORADO HOSPITAL", "DENVER", "CO", 2020,
+  "N0041074", "BOSTON MEDICAL CENTER", "BOSTON", "MA", 2024,
+  "N021P00001", "OHSU HOSPITAL", "PORTLAND", "OR", 2023,
+  "N030B12001", "GEISINGER MEDICAL CENTER - DANVILLE", "DANVILLE", "PA", 2024,
+  "N009N8DHMC", "DENVER HEALTH MEDICAL CENTER", "DENVER", "CO", 2023,
+  "N024000425", "UNIVERSITY OF LOUISVILLE HOSPITAL ULH", "LOUISVILLE", "KY", 2024,
+  "N020S98MDH", "MCKAY-DEE HOSPITAL CENTER", "OGDEN", "UT", 2024,
+  "N003B1SCOT", "CHILDREN'S HEALTHCARE OF ATLANTA-SCOTTISH RITE", "ATLANTA", "GA", 2025,
+  "N017EUCL", "MAYO CLINIC HEALTH SYSTEM EAU CLAIRE", "EAU CLAIRE", "WI", 2024,
+  "N02933025", "NAVAL MEDICAL CENTER PORTSMOUTH", "PORTSMOUTH", "VA", 2024,
+  "N030B48001", "GEISINGER WYOMING VALLEY MEDICAL CENTER", "WILKES BARRE", "PA", 2024,
+  "N020S98DRM", "ST GEORGE REGIONAL MEDICAL CENTER", "ST GEORGE", "UT", 2023,
+  "N020B5STAH", "SAINT ALPHONSUS MEDICAL GROUP NAMPA", "NAMPA", "ID", 2024,
+  "N020S98UVR", "UTAH VALLEY HOSPITAL", "PROVO", "UT", 2023
+)
+
+state_lookup <- tibble::tibble(
+  state = state.abb,
+  region = tolower(state.name),
+  center_x = state.center$x,
+  center_y = state.center$y
+)
+
+us_states <- ggplot2::map_data("state")
+hospital_states <- state_lookup %>%
+  semi_join(hospital_switch_map, by = "state")
+
+hospital_map_df <- hospital_switch_map %>%
+  left_join(state_lookup, by = "state") %>%
+  group_by(state) %>%
+  arrange(switch_yr, hospital, .by_group = TRUE) %>%
+  mutate(
+    hospitals_in_state = n(),
+    hospital_rank = row_number(),
+    angle = if_else(
+      hospitals_in_state == 1,
+      0,
+      2 * pi * (hospital_rank - 1) / hospitals_in_state
+    ),
+    lon = center_x + 1.6 * cos(angle),
+    lat = center_y + 1.1 * sin(angle)
+  ) %>%
+  ungroup()
+
+ggplot() +
+  geom_polygon(
+    data = us_states,
+    aes(x = long, y = lat, group = group),
+    fill = "gray97",
+    color = "white",
+    linewidth = 0.2
+  ) +
+  geom_text(
+    data = hospital_states,
+    aes(x = center_x, y = center_y, label = state),
+    color = "gray65",
+    size = 2.4
+  ) +
+  geom_point(
+    data = hospital_map_df,
+    aes(x = lon, y = lat, color = factor(switch_yr)),
+    size = 3.8,
+    alpha = 0.9
+  ) +
+  coord_quickmap(
+    xlim = c(-125, -66),
+    ylim = c(24, 50),
+    expand = FALSE
+  ) +
+  scale_color_manual(
+    values = c(
+      "2020" = "#1b9e77",
+      "2023" = "#d95f02",
+      "2024" = "#7570b3",
+      "2025" = "#e7298a"
+    ),
+    name = "Switch Yr"
+  ) +
+  labs(
+    title = "Hospital Switch Year Map",
+    subtitle = "Each point represents one hospital from the uploaded image.\nHospitals in the same state are offset around the state center for visibility."
+  ) +
+  theme_void(base_family = "Arial") +
+  theme(
+    legend.position = "right",
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 10, color = "gray30")
+  )
+```
+
+- This map uses the hospitals visible in the uploaded image and places one point per hospital at the corresponding state location.
+- Point colors indicate `Switch Yr`, and hospitals sharing the same state are slightly offset so all sites remain visible.
 ### LTOWB% by year{.tabset}
 ```{r warning=FALSE, message=FALSE, echo=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
@@ -170,6 +276,7 @@ library(knitr)
 library(kableExtra)
 library(data.table)
 library(htmltools)
+library(maps)
 library(downloadthis)
 library(writexl)
 library(gt)
