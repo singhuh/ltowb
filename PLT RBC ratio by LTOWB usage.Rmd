@@ -937,7 +937,7 @@ less_than_2perc_long %>%
 ```
 
 
-### Median PLT:RBC by LTWOB%
+### Median PLT:RBC by LTOWB%
 ```{r warning=FALSE, message=FALSE, echo=FALSE}
 # Summarize: mean and SE (cluster-robust CIs optional in B)
 summary_by_year <- df %>%
