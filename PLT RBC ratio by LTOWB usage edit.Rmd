@@ -731,7 +731,6 @@ list2 %>% select(-c("Ship To Addr1")) %>%
 library(dplyr)
 library(leaflet)
 library(htmltools)
-
 state_lookup_lt2 <- tibble::tibble(
   state = state.abb,
   center_x = state.center$x,
