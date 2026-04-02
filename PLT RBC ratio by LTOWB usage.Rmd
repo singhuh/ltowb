@@ -231,7 +231,7 @@ ggplot(hosp_pct,
   
   scale_color_manual(
     values = jama_gray,
-    name = "LTWOB category"
+    name = "LTOWB category"
   ) +
   
   scale_y_continuous(
@@ -247,28 +247,28 @@ geom_text(aes(label = paste0(round(100*pct,1), "%")),
               size = 3.3) +
   
   labs(
-    title = "Percentage of Hospitals in Each LTWOB Category by Year",
+    title = "Percentage of Hospitals in Each LTOWB Category by Year",
     x = "Calendar Year",
     y = "Percentage of Hospitals"
   ) +  theme_jama()
 ```
 
 
-**Percentage of Hospitals in Each LTWOB Category by Calendar Year**
+**Percentage of Hospitals in Each LTOWB Category by Calendar Year**
 - This figure displays the proportion of hospitals falling into each low‑titer O whole blood (LTOWB) utilization category—<2%, 2.5–5.0%, and >5%—from 2018 through 2025. Percentages represent the share of all hospitals reporting data in a given year.
 
 - **Key Findings**
-  + **Growth of higher LTWOB categories over time.**
-  + Hospitals utilizing LTWOB at >5% or 2.5–5% remained a minority but expanded steadily after 2022.
+  + **Growth of higher LTOWB categories over time.**
+  + Hospitals utilizing LTOWB at >5% or 2.5–5% remained a minority but expanded steadily after 2022.
 - The >5% category increased from 1.4% in 2022 to 18.1% in 2024 and 18.1% in 2025.
 - The 2.5–5% category increased modestly, reaching 11.1% in 2024–2025.
 
 **Inflection point in 2022.**
 - In 2022, the <2% category temporarily peaked at 97.1%, coinciding with the lowest representation of higher‑use hospitals (<3% in both mid‑tier and high‑tier categories).<br>
-- Beginning in 2023, however, the distribution began to shift as more hospitals incorporated LTWOB at higher percentages.
+- Beginning in 2023, however, the distribution began to shift as more hospitals incorporated LTOWB at higher percentages.
 
 **Emerging adoption pattern after 2023.**
-- Between 2023 and 2025, the proportion of hospitals performing >5% LTWOB usage increased more sharply compared with the 2.5–5% group, suggesting movement directly from low (<2%) to high (>5%) uptake rather than gradual progression. 
+- Between 2023 and 2025, the proportion of hospitals performing >5% LTOWB usage increased more sharply compared with the 2.5–5% group, suggesting movement directly from low (<2%) to high (>5%) uptake rather than gradual progression. 
 
 #### Hospitals increasing LTOWB use{.tabset #csp-up}
 ##### List
@@ -600,7 +600,7 @@ switcher_details %>%
   )
 ```
 
-- **Hospital‑Level Trends in Low‑Titer Whole Blood (LTWOB) Use, 2018–2025**
+- **Hospital‑Level Trends in Low‑Titer Whole Blood (LTOWB) Use, 2018–2025**
 
 ##### Hospital Counts: <2% to >5% LTOWB use  
 ```{r warning=FALSE, message=FALSE, echo=FALSE}
@@ -623,10 +623,10 @@ ggplot(switch_year_counts,
 
 ```
 
-- Across the study period, several hospitals transitioned from low LTWOB utilization 
+- Across the study period, several hospitals transitioned from low LTOWB utilization 
 (<2%) to high utilization (>5%). 
 - These transitions occurred predominantly after 2023, 
-consistent with the system‑level increase in hospitals adopting higher LTWOB usage in later years 
+consistent with the system‑level increase in hospitals adopting higher LTOWB usage in later years 
 
 
 #### Hospitals without increase in LTOWB use{.tabset #csp-down}
