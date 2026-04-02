@@ -355,7 +355,7 @@ download_file(
 #     `>5% LTOWB` = greater_than_5pct
 #   ) %>%
 #   kable(
-#     caption = "Hospitals Switching from <2% to >5% LTWOB Usage",
+#     caption = "Hospitals Switching from <2% to >5% LTOWB Usage",
 #     booktabs = TRUE
 #   ) %>%
 #   kable_styling(
@@ -965,15 +965,15 @@ ggplot(summary_by_year,
   labs(
     x = "Calendar year",
     y = "PLT:RBC ratio",
-    color = "LTWOB %usage",
-    title = "Figure 1. Change in PLT:RBC ratio by LTWOB category over time (descriptive medians)"
+    color = "LTOWB %usage",
+    title = "Figure 1. Change in PLT:RBC ratio by LTOWB category over time (descriptive medians)"
   ) +
   theme_pubclean(base_size = 12) +
   ylim(0,1.2)
 ```
 
-- Across eight years of observation, only hospitals with >5% LTWOB usage demonstrated a substantial temporary rise in PLT:RBC ratios, peaking in 2020, with subsequent decline and convergence toward the lower utilization categories by 2023–2025.
-- These descriptive patterns suggest early implementation‑related variability in high‑LTWOB hospitals, with stabilization of transfusion ratios over time.
+- Across eight years of observation, only hospitals with >5% LTOWB usage demonstrated a substantial temporary rise in PLT:RBC ratios, peaking in 2020, with subsequent decline and convergence toward the lower utilization categories by 2023–2025.
+- These descriptive patterns suggest early implementation‑related variability in high‑LTOWB hospitals, with stabilization of transfusion ratios over time.
   + *Note: These values represent descriptive medians and do not reflect model‑adjusted estimates or tests of statistical significance.*
 
 
@@ -994,24 +994,24 @@ m <- lmer(pltrbcratio ~ ltwobcat * year_f + (1 | customer_cd), data = hosp, REML
 a <- anova(m, type = 3, ddf = "Kenward-Roger") #If pbkrtest is not installed, lmerTest will fall back to Satterthwaite
 
 # Replace row names with publication‑ready labels
-rownames(a) <- c("LTWOB category",
+rownames(a) <- c("LTOWB category",
                  "Calendar year",
-                 "LTWOB category × year")
+                 "LTOWB category × year")
 
 a
 ```
 
 - A linear mixed model (hospital random intercept) showed a highly significant 
-**LTWOB category × year** interaction (p < 1.3e-33), 
-  + indicating that differences in PLT:RBC ratio across LTWOB adoption levels 
+**LTOWB category × year** interaction (p < 1.3e-33), 
+  + indicating that differences in PLT:RBC ratio across LTOWB adoption levels 
     changed substantially over time.
-- Main effects for **year** (p < 10⁻⁹) and **LTWOB** category (p = 0.019) were also significant, 
+- Main effects for **year** (p < 10⁻⁹) and **LTOWB** category (p = 0.019) were also significant, 
 but are not interpreted because of the strong interaction.
 
 #### Within-year tests
 ```{r warning=FALSE, message=FALSE, echo=FALSE}
 # ======================================================
-# 4) Within-year tests: Do LTWOB categories differ *in each year*?
+# 4) Within-year tests: Do LTOWB categories differ *in each year*?
 #    Tukey-adjusted pairwise differences and overall F per year
 # ======================================================
 emm <- emmeans(m, ~ ltwobcat | year_f)   # LS-means by category within each year
@@ -1045,7 +1045,7 @@ pw_clean <- pw_df %>%
 # Render as formatted publication-style table
 pw_clean %>%
   kable(
-    caption = "Tukey-adjusted pairwise differences in PLT:RBC ratio by LTWOB category within each calendar year.",
+    caption = "Tukey-adjusted pairwise differences in PLT:RBC ratio by LTOWB category within each calendar year.",
     booktabs = TRUE,
     align = "lcccccc"
   ) %>%
@@ -1058,7 +1058,7 @@ pw_clean %>%
 
 ```
 
-- The output shows within‑year comparisons among the 3 LTWOB categories:
+- The output shows within‑year comparisons among the 3 LTOWB categories:
   + '<2% LTOWB use'
   + '2.5–5.0% LTOWB use'
   + '>5% LTOWB use'
@@ -1071,12 +1071,12 @@ pw_clean %>%
 - **2020**: highly significant spike in the >5 category vs both other groups.
   + <2 and 2.5–5.0 do not differ (p ≈ 0.99).
   + Both are dramatically lower than >5 (difference ≈ −3.0 units, p < 0.0001).
-  + **Conclusion (2020)**: The hospitals with >5% LTOWB usage have significantly higher PLT:RBC than both other LTWOB groups.
+  + **Conclusion (2020)**: The hospitals with >5% LTOWB usage have significantly higher PLT:RBC than both other LTOWB groups.
 - **2021**: No differences.
 - **2022**: *Reverse effect*: >5 category now has significantly lower PLT:RBC ratio than both 2.5–5.0 and <2.
 <2 and 2.5–5.0 do not differ significantly. Both have significantly higher PLT:RBC ratio than the >5 category.
 **Conclusion:** A reversal compared to 2020. Now hospitals with >5% LTOWB usage have significantly lower PLT:RBC ratio.
-- **2023–2025**: No meaningful differences; groups converge in 2023; LTWOB categories remain similar 
+- **2023–2025**: No meaningful differences; groups converge in 2023; LTOWB categories remain similar 
 
 ### Model-adjusted means 
 ```{r warning=FALSE, message=FALSE, echo=FALSE}
@@ -1089,10 +1089,10 @@ ggplot(emm_df, aes(calendar_yr, emmean, color = ltwobcat, group = ltwobcat)) +
   geom_point(size = 2) +
   geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.15, alpha = 0.7) +
   scale_color_manual(values = c("<2"="#e15759","2-5"="#59a14f",">5"="#4e79a7"),
-                     name = "LTWOB category") +
+                     name = "LTOWB category") +
   scale_x_continuous(breaks = sort(unique(emm_df$calendar_yr))) +
   labs(
-    title = "Figure 2. Adjusted PLT:RBC ratio between hospitals categorized by LTWOB % over time (mixed model LS-means)",
+    title = "Figure 2. Adjusted PLT:RBC ratio between hospitals categorized by LTOWB % over time (mixed model LS-means)",
     x = "Calendar year", y = "Adjusted PLT:RBC ratio (LS-mean)"
   ) +
   theme_pubclean(base_size = 13) +
@@ -1101,7 +1101,7 @@ ggplot(emm_df, aes(calendar_yr, emmean, color = ltwobcat, group = ltwobcat)) +
 
 
 - **Comparision with the Raw Descriptive Medians (Unadjusted) in Figure 1**
-- Figure 1 displays simple medians of the observed PLT:RBC ratio within each LTWOB category and year, without adjusting for:
+- Figure 1 displays simple medians of the observed PLT:RBC ratio within each LTOWB category and year, without adjusting for:
   + differences in hospital size
   + differences in case mix
   + differences in hospital‑level random effects (baseline transfusion tendency)
@@ -1109,7 +1109,7 @@ ggplot(emm_df, aes(calendar_yr, emmean, color = ltwobcat, group = ltwobcat)) +
   + changes in category membership over time
 - Because these medians reflect the observed distribution only, they are susceptible to:
   + influence of a few hospitals with unusually high ratios in that year
-  + differences in which hospitals fall into each LTWOB category each year
+  + differences in which hospitals fall into each LTOWB category each year
   + uneven sample sizes across categories
   + regression dilution or skewed distributions
 - Thus, Figure 1 is based on the data as it is, before accounting for clustering and model structure.
@@ -1117,18 +1117,18 @@ ggplot(emm_df, aes(calendar_yr, emmean, color = ltwobcat, group = ltwobcat)) +
 - **Figure 2** above is the Model‑Adjusted LS‑means (Mixed Model)
   + displays the least‑squares means from a linear mixed‑effects model with:
     * hospital random intercepts (accounting for repeated measures and baseline differences),
-    * a LTWOB category × year interaction,
+    * a LTOWB category × year interaction,
     * and adjustment for the unbalanced structure of the data.
 
 - Therefore, the LS‑means represent the expected PLT:RBC ratio for each category and year after controlling for hospital‑level variability.
 - This modeling makes important changes:
   + Removes influence of hospitals with unusually high or low raw values
-    * 2022 may contain hospitals with extreme ratios in certain LTWOB categories.
+    * 2022 may contain hospitals with extreme ratios in certain LTOWB categories.
     * Random effects shrink those extremes toward the group mean.
   + Adjusts for differences in the number of hospitals per category
     * If 2022 has fewer hospitals in the >5% category, the LS‑mean is estimated with more shrinkage and may differ from the raw median.
 - Corrects for category switching
-  + If some hospitals moved between LTWOB categories from 2020 → 2022, the unadjusted medians reflect this churn, but the mixed model handles repeated measures appropriately.
+  + If some hospitals moved between LTOWB categories from 2020 → 2022, the unadjusted medians reflect this churn, but the mixed model handles repeated measures appropriately.
 
 - The >5% category shows a markedly lower adjusted mean in 2022, dropping below both <2% and 2.5–5.0%.
 - The 2.5–5.0% group appears elevated relative to others, with wide confidence intervals.
@@ -1183,22 +1183,22 @@ res_clean %>%
 ```
 
 
-- These estimates represent adjusted mean differences in PLT:RBC ratio between hospitals with >5% LTWOB 
+- These estimates represent adjusted mean differences in PLT:RBC ratio between hospitals with >5% LTOWB 
 usage and those with <2%, generated from a linear mixed model including a hospital‑level random intercept 
-and a LTWOB category × year interaction. 
+and a LTOWB category × year interaction. 
   + Positive values indicate higher PLT:RBC ratios in the >5% group; 
   + Negative values indicate lower ratios. 
   + Confidence intervals are 95%, with Kenward–Roger degrees of freedom.
   + The adjusted difference in PLT:RBC ratio between hospitals with >5% versus <2% 
-  + LTWOB utilization varied substantially over time. 
+  + LTOWB utilization varied substantially over time. 
 
 - A pronounced elevation in the >5% group was observed in 2020 (difference, 3.03; p < 0.0001), representing a strong 
 early divergence in component use.
 - By 2022, this pattern reversed, with the >5% group demonstrating significantly lower adjusted ratios 
 (difference, −0.90; p = 0.012).
 - No significant differences were observed in 2019 or 2021, nor in 2023–2025, indicating a return to alignment 
-across LTWOB categories in later years.
-- The adjusted difference in PLT:RBC ratio between hospitals with >5% and <2 LTWOB utilization varied 
+across LTOWB categories in later years.
+- The adjusted difference in PLT:RBC ratio between hospitals with >5% and <2 LTOWB utilization varied 
 substantially over time (significant interaction). A marked elevation in PLT:RBC ratio was observed 
 among >5% hospitals in 2020, with adjusted differences exceeding 3 units compared with the <2% group (p < 0.0001).
 - By 2022, this pattern reversed, with the >5% group demonstrating significantly lower adjusted ratios 
@@ -1246,7 +1246,7 @@ res_clean %>%
   collapse_rows(columns = 1, valign = "top")
 ```
 
-- The adjusted difference in PLT:RBC ratio between hospitals with >5% and 2.5–5% LTWOB utilization varied 
+- The adjusted difference in PLT:RBC ratio between hospitals with >5% and 2.5–5% LTOWB utilization varied 
 substantially over time (significant interaction). A marked elevation in PLT:RBC ratio was observed 
 among >5% hospitals in 2020, with adjusted differences exceeding 3 units compared with the 2.5–5% group (p < 0.0001).
 - A pronounced elevation in the >5% group was observed in 2020 (difference, 3.06; p < 0.0001), representing a strong 
@@ -1254,7 +1254,7 @@ early divergence in component use.
 - By 2022, this pattern reversed, with the >5% group demonstrating significantly lower adjusted ratios 
 (difference, −1.47; p = 0.003).
 - No significant differences were observed in 2019 or 2021, nor in 2023–2025, indicating a return to alignment 
-across LTWOB categories in later years.
+across LTOWB categories in later years.
 - For all subsequent years (2023–2025), the categories showed no meaningful differences, with point estimates clustered near zero.
-> Temporal fluctuations in PLT:RBC ratio among hospitals with higher LTWOB usage suggest early variability in transfusion 
+> Temporal fluctuations in PLT:RBC ratio among hospitals with higher LTOWB usage suggest early variability in transfusion 
 practices during whole‑blood program rollout, followed by stabilization and convergence across hospitals in subsequent years.
